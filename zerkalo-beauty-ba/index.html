@@ -570,56 +570,52 @@
 
     let curMaster = "";
     let selectedServices = [];
+    let isAllServicesExpanded = false; // ЖЕЛЕЗОБЕТОННО НАВЕРХУ! ОШИБКА ИНИЦИАЛИЗАЦИИ УНИЧТОЖЕНА.
 
-    function initSite() {
-    // Подставляем кастомные цвета из CONFIG
-    document.documentElement.style.setProperty('--accent', CONFIG.accent);
-    document.documentElement.style.setProperty('--accent-hover', CONFIG.accentHover);
-    document.documentElement.style.setProperty('--accent-text', CONFIG.accentText);
-    
-    // Безопасное заполнение текстовых полей салона
-    const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; };
-    
-    setTxt('s-name', CONFIG.name);
-    setTxt('h-name', CONFIG.name);
-    setTxt('b-badge', CONFIG.badge);
-    setTxt('b-title', CONFIG.title);
-    setTxt('b-desc', CONFIG.desc);
-    setTxt('f-name', CONFIG.name);
-    
-    // Проверяем правильные мобильные/десктопные ID контактов
-    setTxt('a-addr', CONFIG.address);
-    setTxt('a-hours', CONFIG.hours);
-    setTxt('a-phone', CONFIG.phone);
-    setTxt('c-address', CONFIG.address);
-    setTxt('c-phone', CONFIG.phone);
-    setTxt('c-hours', CONFIG.hours);
-    
-    const phoneLink = document.getElementById('a-phone');
-    if (phoneLink && CONFIG.phoneRaw) phoneLink.href = `tel:${CONFIG.phoneRaw}`;
-    
-    const fYear = document.getElementById('f-year');
-    if (fYear) fYear.innerText = new Date().getFullYear();
+    async function initSite() {
+        document.documentElement.style.setProperty('--accent', CONFIG.accent);
+        document.documentElement.style.setProperty('--accent-hover', CONFIG.accentHover);
+        document.documentElement.style.setProperty('--accent-text', CONFIG.accentText);
+        
+        const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; };
+        
+        setTxt('s-name', CONFIG.name);
+        setTxt('h-name', CONFIG.name);
+        setTxt('b-badge', CONFIG.badge);
+        setTxt('b-title', CONFIG.title);
+        setTxt('b-desc', CONFIG.desc);
+        setTxt('f-name', CONFIG.name);
+        setTxt('a-addr', CONFIG.address);
+        setTxt('a-hours', CONFIG.hours);
+        setTxt('a-phone', CONFIG.phone);
+        setTxt('c-address', CONFIG.address);
+        setTxt('c-phone', CONFIG.phone);
+        setTxt('c-hours', CONFIG.hours);
+        
+        const phoneLink = document.getElementById('a-phone');
+        if (phoneLink && CONFIG.phoneRaw) phoneLink.href = `tel:${CONFIG.phoneRaw}`;
+        
+        const fYear = document.getElementById('f-year');
+        if (fYear) fYear.innerText = new Date().getFullYear();
 
-    const hero = document.getElementById('hero-section');
-    if (hero && CONFIG.heroImg) hero.style.backgroundImage = `linear-gradient(to bottom, rgba(15,23,42,0.3), rgba(15,23,42,0.8)), url('${CONFIG.heroImg}')`;
+        const hero = document.getElementById('hero-section');
+        if (hero && CONFIG.heroImg) hero.style.backgroundImage = `linear-gradient(to bottom, rgba(15,23,42,0.3), rgba(15,23,42,0.8)), url('${CONFIG.heroImg}')`;
 
-    // 🚀 Безопасный запрос к Google Таблице напрямую из браузера
-    if (typeof CONFIG.googleSheetId !== 'undefined' && CONFIG.googleSheetId) {
-        fetch(`https://google.com{CONFIG.googleSheetId}/gviz/tq?tqx=out:json`)
-            .then(res => res.text())
-            .then(text => {
+        if (typeof CONFIG.googleSheetId !== 'undefined' && CONFIG.googleSheetId) {
+            try {
+                const res = await fetch(`https://google.com{CONFIG.googleSheetId}/gviz/tq?tqx=out:json`);
+                const text = await res.text();
                 const jsonString = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
                 const data = JSON.parse(jsonString);
                 const rows = data.table.rows;
                 let onlineServices = [];
                 
                 rows.forEach((row, idx) => {
-                    if (idx === 0) return; // пропускаем заголовок таблицы
-                    if (row.c && row.c[0] && row.c[0].v) {
+                    if (idx === 0) return;
+                    if (row.c && row.c && row.c[0] && row.c[0].v) {
                         const name = row.c[0].v;
-                        const dur = (row.c[1] && row.c[1].v) ? row.c[1].v : "";
-                        const price = (row.c[2] && row.c[2].v) ? row.c[2].v : "По прайсу";
+                        const dur = (row.c && row.c[1] && row.c[1].v) ? row.c[1].v : "";
+                        const price = (row.c && row.c[2] && row.c[2].v) ? row.c[2].v : "По прайсу";
                         onlineServices.push({
                             name: String(name).trim(),
                             dur: String(dur).trim(),
@@ -629,216 +625,190 @@
                 });
 
                 if (onlineServices.length > 0) {
-                    if (!CONFIG.categories || CONFIG.categories.length === 0) {
-                        CONFIG.categories = [{ id: "1", title: "Все услуги", items: [] }];
-                    }
-                    CONFIG.categories[0].items = onlineServices;
-                    
-                    // Перерисовываем интерфейс после успешной загрузки прайса
-                    renderCategories();
-                    renderBookingChips();
-                    updateSummary();
+                    CONFIG.categories = [{ id: "1", title: "Все услуги", items: onlineServices }];
                 }
-            })
-            .catch(err => console.error("Ошибка live-загрузки прайса:", err));
-    }
+            } catch (err) {
+                console.error("Ошибка live-загрузки прайса из Google Sheets:", err);
+            }
+        }
 
-    // Первичный рендер всех стандартных блоков структуры
-    renderCategories();
-    initGallery();
-    initReviews();
-    renderBookingChips();
-    updateSummary();
-}
-
-
-    renderCategories();
-
-
-      const galTrack = document.getElementById('gal-track');
-      galTrack.innerHTML = '';
-      if(CONFIG.gallery && CONFIG.gallery.length > 0) {
-        CONFIG.gallery.forEach(item => {
-          galTrack.innerHTML += `<div class="gal-item"><img src="${item.img}"><div class="gal-cap">${item.cap}</div></div>`;
-        });
-      } else { document.getElementById('gallery').style.display = 'none'; }
-
-      const revTrack = document.getElementById('rev-track');
-      revTrack.innerHTML = '';
-      if(CONFIG.reviews && CONFIG.reviews.length > 0) {
-        CONFIG.reviews.forEach(r => {
-          revTrack.innerHTML += `<div class="rev"><div><div class="stars">★★★★★</div><p>"${r.text}"</p></div><div class="rev-auth">${r.author} • ${r.date}</div></div>`;
-        });
-      } else { document.getElementById('reviews').style.display = 'none'; }
-
-         const bMaster = document.getElementById('b-master');
-    if (bMaster) bMaster.innerHTML = CONFIG.masters.map(m => `<option>${m}</option>`).join('');
-    
-    const bTime = document.getElementById('b-time');
-    if (bTime) bTime.innerHTML = CONFIG.times.map(t => `<option>${t}</option>`).join('');
-    
-    // Финальный вызов всех рендеров
-    renderCategories();
-    initGallery();
-    initReviews();
-    renderBookingChips();
-    updateSummary();
-
-
-let isAllServicesExpanded = false;
-
-
-function renderCategories() {
-    const tabsContainer = document.getElementById('categories-tabs');
-    if (!tabsContainer) return;
-    tabsContainer.innerHTML = '';
-    
-    CONFIG.categories.forEach((cat, index) => {
-        const btn = document.createElement('button');
-        btn.className = `tab ${index === 0 ? 'active' : ''}`;
-        btn.innerText = cat.title;
-        btn.onclick = () => {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            btn.classList.add('active');
-            isAllServicesExpanded = false; // Сбрасываем шторку при переключении категории
-            renderServicesGrid(cat.items);
-        };
-        tabsContainer.appendChild(btn);
-    });
-    renderServicesGrid(CONFIG.categories[0].items);
-}
-
-function renderServicesGrid(items) {
-    const grid = document.getElementById('services-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    
-    if (!items || items.length === 0) return;
-    
-    // Показываем первые 4 или вообще все в зависимости от флага
-    const servicesToRender = isAllServicesExpanded ? items : items.slice(0, 4);
-    
-    servicesToRender.forEach(srv => {
-        grid.innerHTML += `<div class="srv"><div><h4>${srv.name}</h4></div><span>${srv.price}</span><button class="btn-select" onclick="selectServiceDirectly('${srv.name}')">Выбрать</button></div>`;
-    });
-    
-    // Если услуг в категории больше 4, аккуратно добавляем кнопку управления списком
-    if (items.length > 4) {
-        const wrapper = document.createElement('div');
-        wrapper.style.width = '100%';
-        wrapper.style.display = 'flex';
-        wrapper.style.justifyContent = 'center';
-        wrapper.style.marginTop = '20px';
-        
-        const toggleBtn = document.createElement('button');
-        toggleBtn.style.padding = '10px 20px';
-        toggleBtn.style.borderRadius = '20px';
-        toggleBtn.style.background = 'var(--accent)';
-        toggleBtn.style.color = '#ffffff';
-        toggleBtn.style.border = 'none';
-        toggleBtn.style.cursor = 'pointer';
-        toggleBtn.style.fontSize = '14px';
-        
-        toggleBtn.innerText = isAllServicesExpanded ? 'Свернуть список услуг ↑' : `Показать все услуги (${items.length}) ↓`;
-        
-        toggleBtn.onclick = () => {
-            isAllServicesExpanded = !isAllServicesExpanded;
-            renderServicesGrid(items); // Перерисовываем карточки
-        };
-        
-        wrapper.appendChild(toggleBtn);
-        grid.appendChild(wrapper);
-    }
-}
-
-
-    function getAllServicesFlat() {
-      let all = [];
-      if(CONFIG.categories) CONFIG.categories.forEach(c => { if(c.items) all = all.concat(c.items); });
-      return all;
-    }
-
-    function toggleChipsDropdown() {
-    const chipsContainer = document.getElementById('booking-chips');
-    const arrow = document.getElementById('toggle-chips-arrow');
-    const text = document.getElementById('toggle-chips-text');
-    if (chipsContainer.style.display === 'none') {
-        chipsContainer.style.display = 'flex';
-        chipsContainer.style.flexWrap = 'wrap';
-        chipsContainer.style.gap = '8px';
-        arrow.innerText = '▲';
-    } else {
-        chipsContainer.style.display = 'none';
-        arrow.innerText = '▼';
-    }
-}
-
-function renderBookingChips() {
-    const chipsContainer = document.getElementById('booking-chips');
-    chipsContainer.innerHTML = '';
-    getAllServicesFlat().forEach(srv => {
-        const isSelected = selectedServices.some(s => s.name === srv.name);
-        const chip = document.createElement('div');
-        chip.className = `chip ${isSelected ? 'selected' : ''}`;
-        chip.innerText = `${srv.name} (${srv.price})`;
-        chip.onclick = () => {
-            if (isSelected) selectedServices = selectedServices.filter(s => s.name !== srv.name);
-            else selectedServices.push(srv);
-            renderBookingChips();
-            updateSummary();
-        };
-        chipsContainer.appendChild(chip);
-    });
-}
-function selectServiceDirectly(name) {
-    const srv = getAllServicesFlat().find(s => s.name === name);
-    if (srv && !selectedServices.some(s => s.name === name)) {
-        selectedServices.push(srv);
+        renderCategories();
+        initGallery();
+        initReviews();
         renderBookingChips();
         updateSummary();
     }
-}
 
-function updateSummary() {
-    const container = document.getElementById('sum-items');
-    container.innerHTML = ''; 
-    let total = 0;
-    
-    selectedServices.forEach(s => {
-        // Находим только первую группу цифр в строке (игнорируем дефисы и вторые цены)
-        let cleanStr = s.price.replace(/\s+/g, ''); // убираем пробелы, чтобы "3 500" стало "3500"
-        let match = cleanStr.match(/\d+/); // ищем первое число
-        let priceNum = match ? parseInt(match[0], 10) : 0;
+    function renderCategories() {
+        const tabsContainer = document.getElementById('categories-tabs');
+        if (!tabsContainer) return;
+        tabsContainer.innerHTML = '';
         
-        total += priceNum;
-        container.innerHTML += `<div class="sum-row"><span>${s.name}</span><span>${s.price}</span></div>`;
-    });
-    
-    document.getElementById('sum-price').innerText = `${total.toLocaleString('ru-RU')} ₽`;
-    
-    const btnText = document.getElementById('toggle-chips-text');
-    if (selectedServices.length > 0) {
-        btnText.innerText = `Выбрано процедур: ${selectedServices.length}`;
-    } else {
-        btnText.innerText = 'Нажмите, чтобы открыть список услуг';
+        if (!CONFIG.categories || CONFIG.categories.length === 0 || !CONFIG.categories[0] || !CONFIG.categories[0].items) {
+            CONFIG.categories = [{ id: "1", title: "Все услуги", items: [] }];
+        }
+        
+        CONFIG.categories.forEach((cat, index) => {
+            const btn = document.createElement('button');
+            btn.className = `tab ${index === 0 ? 'active' : ''}`;
+            btn.innerText = cat.title;
+            btn.onclick = () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+                isAllServicesExpanded = false;
+                renderServicesGrid(cat.items);
+            };
+            tabsContainer.appendChild(btn);
+        });
+        renderServicesGrid(CONFIG.categories[0].items);
     }
-}
+    function renderServicesGrid(items) {
+        const grid = document.getElementById('services-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        
+        if (!items || items.length === 0) {
+            grid.innerHTML = '<p style="color:var(--muted);padding:10px;">Прайс-лист обновляется мастером...</p>';
+            return;
+        }
+        
+        const servicesToRender = isAllServicesExpanded ? items : items.slice(0, 4);
+        
+        servicesToRender.forEach(srv => {
+            grid.innerHTML += `<div class="srv"><div><h4>${srv.name}</h4></div><span>${srv.price}</span><button class="btn-select" onclick="selectServiceDirectly('${srv.name}')">Выбрать</button></div>`;
+        });
+        
+        if (items.length > 4) {
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'width:100%; display:flex; justify-content:center; margin-top:20px;';
+            
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'btn-select';
+            toggleBtn.innerText = isAllServicesExpanded ? 'Свернуть список услуг ↑' : `Показать все услуги (${items.length}) ↓`;
+            toggleBtn.onclick = () => {
+                isAllServicesExpanded = !isAllServicesExpanded;
+                renderServicesGrid(items);
+            };
+            wrapper.appendChild(toggleBtn);
+            grid.appendChild(wrapper);
+        }
+    }
 
+    function initGallery() {
+        const galTrack = document.getElementById('gal-track');
+        if (!galTrack) return;
+        galTrack.innerHTML = '';
+        if (CONFIG.gallery && CONFIG.gallery.length > 0) {
+            CONFIG.gallery.forEach(item => {
+                galTrack.innerHTML += `<div class="gal-item"><img src="${item.img}"><div class="gal-cap">${item.cap}</div></div>`;
+            });
+        } else {
+            const galSec = document.getElementById('gallery');
+            if (galSec) galSec.style.display = 'none';
+        }
+    }
 
+    function initReviews() {
+        const revTrack = document.getElementById('rev-track');
+        if (!revTrack) return;
+        revTrack.innerHTML = '';
+        if (CONFIG.reviews && CONFIG.reviews.length > 0) {
+            CONFIG.reviews.forEach(r => {
+                revTrack.innerHTML += `<div class="rev"><div><div class="stars">★★★★★</div><p>"${r.text}"</p></div><div class="rev-auth">${r.author} • ${r.date}</div></div>`;
+            });
+        } else {
+            const revSec = document.getElementById('reviews');
+            if (revSec) revSec.style.display = 'none';
+        }
+    }
 
+    function getAllServicesFlat() {
+        let all = [];
+        if (CONFIG.categories && CONFIG.categories[0] && CONFIG.categories[0].items) {
+            all = CONFIG.categories[0].items;
+        }
+        return all;
+    }
 
+    function toggleChipsDropdown() {
+        const chipsContainer = document.getElementById('booking-chips');
+        const arrow = document.getElementById('toggle-chips-arrow');
+        if (!chipsContainer) return;
+        if (chipsContainer.style.display === 'none' || !chipsContainer.style.display) {
+            chipsContainer.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; max-height:300px; overflow-y:auto; border:1px solid var(--border); padding:10px; border-radius:8px;';
+            if (arrow) arrow.innerText = '▲';
+        } else {
+            chipsContainer.style.display = 'none';
+            if (arrow) arrow.innerText = '▼';
+        }
+    }
+
+    function renderBookingChips() {
+        const chipsContainer = document.getElementById('booking-chips');
+        if (!chipsContainer) return;
+        chipsContainer.innerHTML = '';
+        getAllServicesFlat().forEach(srv => {
+            const isSelected = selectedServices.some(s => s.name === srv.name);
+            const chip = document.createElement('div');
+            chip.className = `chip ${isSelected ? 'selected' : ''}`;
+            chip.innerText = `${srv.name} (${srv.price})`;
+            chip.onclick = () => {
+                if (isSelected) selectedServices = selectedServices.filter(s => s.name !== srv.name);
+                else selectedServices.push(srv);
+                renderBookingChips();
+                updateSummary();
+            };
+            chipsContainer.appendChild(chip);
+        });
+    }
+
+    function selectServiceDirectly(name) {
+        const srv = getAllServicesFlat().find(s => s.name === name);
+        if (srv && !selectedServices.some(s => s.name === name)) {
+            selectedServices.push(srv);
+            renderBookingChips();
+            updateSummary();
+        }
+    }
+
+    function updateSummary() {
+        const container = document.getElementById('sum-items');
+        if (!container) return;
+        container.innerHTML = ''; 
+        let total = 0;
+        
+        selectedServices.forEach(s => {
+            let cleanStr = s.price.replace(/\s+/g, '');
+            let match = cleanStr.match(/\d+/);
+            let priceNum = match ? parseInt(match[0], 10) : 0;
+            total += priceNum;
+            container.innerHTML += `<div class="sum-row"><span>${s.name}</span><span>${s.price}</span></div>`;
+        });
+        
+        const sumPriceEl = document.getElementById('sum-price');
+        if (sumPriceEl) sumPriceEl.innerText = `${total.toLocaleString('ru-RU')} ₽`;
+        
+        const btnText = document.getElementById('toggle-chips-text');
+        if (btnText) {
+            btnText.innerText = selectedServices.length > 0 ? `Выбрано процедур: ${selectedServices.length}` : 'Нажмите, чтобы открыть список услуг';
+        }
+    }
 
     function sendOrder() {
-      const name = document.getElementById('b-name').value.trim();
-      const phone = document.getElementById('b-phone').value.trim();
-      if(!name || !phone || selectedServices.length === 0) { alert('Заполните данные и выберите услуги.'); return; }
-      const srvList = selectedServices.map(s => s.name).join(', ');
-      const msg = `Заявка!\nСалон: ${CONFIG.name}\nИмя: ${name}\nТелефон: ${phone}\nУслуги: ${srvList}\nЧек: ${document.getElementById('sum-price').innerText}`;
-      document.getElementById('toast').style.display = 'block';
-      setTimeout(() => { document.getElementById('toast').style.display = 'none'; }, 3000);
-      window.open(`${CONFIG.maxUrl}?text=${encodeURIComponent(msg)}`, '_blank');
+        const name = document.getElementById('b-name').value.trim();
+        const phone = document.getElementById('b-phone').value.trim();
+        if (!name || !phone || selectedServices.length === 0) { alert('Заполните данные и выберите услуги.'); return; }
+        const srvList = selectedServices.map(s => s.name).join(', ');
+        const msg = `Заявка!\nСалон: ${CONFIG.name}\nИмя: ${name}\nТелефон: ${phone}\nУслуги: ${srvList}\nЧек: ${document.getElementById('sum-price').innerText}`;
+        const toast = document.getElementById('toast');
+        if (toast) {
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+        window.open(`${CONFIG.maxUrl}?text=${encodeURIComponent(msg)}`, '_blank');
     }
+
     window.onload = initSite;
-  </script>
+</script>
 </body>
 </html>
