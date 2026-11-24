@@ -516,12 +516,22 @@
         });
       } else { document.getElementById('reviews').style.display = 'none'; }
 
-      document.getElementById('b-master').innerHTML = CONFIG.masters.map(m => `<option>${m}</option>`).join('');
-      document.getElementById('b-time').innerHTML = CONFIG.times.map(t => `<option>${t}</option>`).join('');
-      renderBookingChips();
+         const bMaster = document.getElementById('b-master');
+    if (bMaster) bMaster.innerHTML = CONFIG.masters.map(m => `<option>${m}</option>`).join('');
     
+    const bTime = document.getElementById('b-time');
+    if (bTime) bTime.innerHTML = CONFIG.times.map(t => `<option>${t}</option>`).join('');
+    
+    // Финальный вызов всех рендеров
+    renderCategories();
+    initGallery();
+    initReviews();
+    renderBookingChips();
+    updateSummary();
 
-    let isAllServicesExpanded = false;
+
+let isAllServicesExpanded = false;
+
 
 function renderCategories() {
     const tabsContainer = document.getElementById('categories-tabs');
