@@ -412,27 +412,40 @@
     let selectedServices = [];
 
     function initSite() {
-    // Подставляем кастомные цвета и тексты из CONFIG
+    // Подставляем кастомные цвета из CONFIG
     document.documentElement.style.setProperty('--accent', CONFIG.accent);
     document.documentElement.style.setProperty('--accent-hover', CONFIG.accentHover);
     document.documentElement.style.setProperty('--accent-text', CONFIG.accentText);
     
-    document.getElementById('s-name').innerText = CONFIG.name;
-    document.getElementById('h-name').innerText = CONFIG.name;
-    document.getElementById('b-badge').innerText = CONFIG.badge;
-    document.getElementById('b-title').innerText = CONFIG.title;
-    document.getElementById('b-desc').innerText = CONFIG.desc;
-    document.getElementById('c-address').innerText = CONFIG.address;
-    document.getElementById('c-phone').innerText = CONFIG.phone;
-    document.getElementById('c-hours').innerText = CONFIG.hours;
-    document.getElementById('f-year').innerText = new Date().getFullYear();
-    if (CONFIG.heroImg) document.getElementById('h-img').src = CONFIG.heroImg;
-    document.querySelectorAll('.max-btn').forEach(el => el.href = CONFIG.maxUrl);
-    document.getElementById('c-map-btn').href = CONFIG.mapUrl;
+    // Безопасное заполнение текстовых полей салона
+    const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; };
+    
+    setTxt('s-name', CONFIG.name);
+    setTxt('h-name', CONFIG.name);
+    setTxt('b-badge', CONFIG.badge);
+    setTxt('b-title', CONFIG.title);
+    setTxt('b-desc', CONFIG.desc);
+    setTxt('f-name', CONFIG.name);
+    
+    // Проверяем правильные мобильные/десктопные ID контактов
+    setTxt('a-addr', CONFIG.address);
+    setTxt('a-hours', CONFIG.hours);
+    setTxt('a-phone', CONFIG.phone);
+    setTxt('c-address', CONFIG.address);
+    setTxt('c-phone', CONFIG.phone);
+    setTxt('c-hours', CONFIG.hours);
+    
+    const phoneLink = document.getElementById('a-phone');
+    if (phoneLink && CONFIG.phoneRaw) phoneLink.href = `tel:${CONFIG.phoneRaw}`;
+    
+    const fYear = document.getElementById('f-year');
+    if (fYear) fYear.innerText = new Date().getFullYear();
 
-    // 🚀 Запрос к Google Таблице напрямую из браузера клиента
+    const hero = document.getElementById('hero-section');
+    if (hero && CONFIG.heroImg) hero.style.backgroundImage = `linear-gradient(to bottom, rgba(15,23,42,0.3), rgba(15,23,42,0.8)), url('${CONFIG.heroImg}')`;
+
+    // 🚀 Безопасный запрос к Google Таблице напрямую из браузера
     if (typeof CONFIG.googleSheetId !== 'undefined' && CONFIG.googleSheetId) {
-        // Делаем асинхронный вызов внутри, чтобы не вешать страницу
         fetch(`https://google.com{CONFIG.googleSheetId}/gviz/tq?tqx=out:json`)
             .then(res => res.text())
             .then(text => {
@@ -456,8 +469,12 @@
                 });
 
                 if (onlineServices.length > 0) {
+                    if (!CONFIG.categories || CONFIG.categories.length === 0) {
+                        CONFIG.categories = [{ id: "1", title: "Все услуги", items: [] }];
+                    }
                     CONFIG.categories[0].items = onlineServices;
-                    // Перерисовываем зависимые блоки после загрузки
+                    
+                    // Перерисовываем интерфейс после успешной загрузки прайса
                     renderCategories();
                     renderBookingChips();
                     updateSummary();
@@ -465,6 +482,15 @@
             })
             .catch(err => console.error("Ошибка live-загрузки прайса:", err));
     }
+
+    // Первичный рендер всех стандартных блоков структуры
+    renderCategories();
+    initGallery();
+    initReviews();
+    renderBookingChips();
+    updateSummary();
+}
+
 
     renderCategories();
 
